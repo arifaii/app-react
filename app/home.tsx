@@ -3,9 +3,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    Alert,
     FlatList,
     Image,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     SafeAreaView,
     StatusBar,
@@ -16,8 +18,54 @@ import {
     View
 } from 'react-native';
 
-// Posts mejorados con más datos
-const initialPosts = [
+// Definición de tipos
+type User = {
+  id: string;
+  name: string;
+  avatar: string;
+  verified: boolean;
+};
+
+type Comment = {
+  id: string;
+  user: {
+    name: string;
+    avatar: string;
+  };
+  content: string;
+  date: Date;
+};
+
+type Post = {
+  id: string;
+  user: User;
+  content: string;
+  date: Date;
+  likes: number;
+  comments: Comment[];
+  shares: number;
+};
+
+// Datos de usuarios para generar posts aleatorios
+const randomUsers: User[] = [
+  { id: 'u4', name: 'María González', avatar: 'https://i.pravatar.cc/150?img=1', verified: false },
+  { id: 'u5', name: 'Carlos Ruiz', avatar: 'https://i.pravatar.cc/150?img=3', verified: true },
+  { id: 'u6', name: 'Ana Martínez', avatar: 'https://i.pravatar.cc/150?img=9', verified: false },
+  { id: 'u7', name: 'Diego López', avatar: 'https://i.pravatar.cc/150?img=7', verified: true },
+  { id: 'u8', name: 'Sofia Chen', avatar: 'https://i.pravatar.cc/150?img=4', verified: false },
+];
+
+// Posts aleatorios para simular refresh
+const randomPosts = [
+  "¡Acabo de terminar mi café matutino y estoy listo para conquistar el día! ☕️✨",
+  "¿Alguien más siente que los lunes deberían ser opcionales? 😴",
+  "Trabajando en un nuevo proyecto con Flutter. ¡La curva de aprendizaje vale la pena! 🚀",
+  "Recomiendo este libro que estoy leyendo: 'Clean Code'. Cambiará tu forma de programar 📚",
+  "¿Cuál es su framework favorito para desarrollo web? Estoy entre React y Vue 🤔",
+];
+
+// Posts iniciales
+const initialPosts: Post[] = [
   {
     id: '1',
     user: {
@@ -29,7 +77,7 @@ const initialPosts = [
     content: '¡Hola comunidad! Este es mi primer post en esta increíble plataforma. Estoy emocionado de compartir mis ideas con todos ustedes. 🚀',
     date: new Date('2025-07-01T10:00:00'),
     likes: 24,
-    comments: 8,
+    comments: [],
     shares: 3,
   },
   {
@@ -43,52 +91,82 @@ const initialPosts = [
     content: '¿Alguien conoce buenas librerías para React Native? Estoy trabajando en un proyecto y necesito algunas recomendaciones. 💻',
     date: new Date('2025-07-01T09:45:00'),
     likes: 15,
-    comments: 12,
+    comments: [
+      {
+        id: 'c1',
+        user: { name: 'Tech Expert', avatar: 'https://i.pravatar.cc/150?img=10' },
+        content: 'Te recomiendo Expo, React Navigation y Reanimated!',
+        date: new Date('2025-07-01T09:50:00'),
+      }
+    ],
     shares: 2,
-  },
-  {
-    id: '3',
-    user: {
-      id: 'u3',
-      name: 'Tech Guru',
-      avatar: 'https://i.pravatar.cc/150?img=8',
-      verified: true,
-    },
-    content: 'Acabé de terminar un proyecto increíble con TypeScript y React Native. La productividad que ofrece el tipado estático es impresionante. 🔥',
-    date: new Date('2025-07-01T09:30:00'),
-    likes: 42,
-    comments: 18,
-    shares: 7,
-  },
+  }
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [posts, setPosts] = useState(initialPosts);
+  const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [newPost, setNewPost] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [newComment, setNewComment] = useState('');
   
-  const currentUser = {
+  const currentUser: User = {
     id: 'u1',
     name: 'Ariel Faivisovich',
     avatar: 'https://i.pravatar.cc/150?img=12',
     verified: true,
   };
 
+  // Generar post aleatorio
+  const generateRandomPost = (): Post => {
+    const randomUser = randomUsers[Math.floor(Math.random() * randomUsers.length)];
+    const randomContent = randomPosts[Math.floor(Math.random() * randomPosts.length)];
+    
+    return {
+      id: `random_${Date.now()}_${Math.random()}`,
+      user: randomUser,
+      content: randomContent,
+      date: new Date(),
+      likes: Math.floor(Math.random() * 50),
+      comments: [],
+      shares: Math.floor(Math.random() * 10),
+    };
+  };
+
+  // Manejar refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    
+    setTimeout(() => {
+      const newPosts: Post[] = [];
+      const numNewPosts = Math.floor(Math.random() * 3) + 1;
+      
+      for (let i = 0; i < numNewPosts; i++) {
+        newPosts.push(generateRandomPost());
+      }
+      
+      setPosts([...newPosts, ...posts]);
+      setRefreshing(false);
+    }, 1500);
+  };
+
+  // Publicar nuevo post
   const onPublish = async () => {
     if (!newPost.trim()) return;
 
     setIsPosting(true);
     
-    // Simular delay de publicación
     setTimeout(() => {
-      const post = {
+      const post: Post = {
         id: Date.now().toString(),
         user: currentUser,
         content: newPost.trim(),
         date: new Date(),
         likes: 0,
-        comments: 0,
+        comments: [],
         shares: 0,
       };
 
@@ -96,6 +174,44 @@ export default function HomeScreen() {
       setNewPost('');
       setIsPosting(false);
     }, 1000);
+  };
+
+  // Abrir modal de comentarios
+  const openComments = (post: Post) => {
+    setSelectedPost(post);
+    setShowComments(true);
+  };
+
+  // Agregar comentario
+  const addComment = () => {
+    if (!newComment.trim() || !selectedPost) return;
+
+    const comment: Comment = {
+      id: `comment_${Date.now()}`,
+      user: {
+        name: currentUser.name,
+        avatar: currentUser.avatar
+      },
+      content: newComment.trim(),
+      date: new Date(),
+    };
+
+    const updatedPosts = posts.map(post => {
+      if (post.id === selectedPost.id) {
+        return {
+          ...post,
+          comments: [...post.comments, comment]
+        };
+      }
+      return post;
+    });
+
+    setPosts(updatedPosts);
+    setSelectedPost({
+      ...selectedPost,
+      comments: [...selectedPost.comments, comment]
+    });
+    setNewComment('');
   };
 
   const formatTime = (date: Date) => {
@@ -110,13 +226,25 @@ export default function HomeScreen() {
     return date.toLocaleDateString();
   };
 
-  const PostItem = ({ item }: { item: any }) => {
+  const PostItem = ({ item }: { item: Post }) => {
     const [liked, setLiked] = useState(false);
     const [likeCount, setLikeCount] = useState(item.likes);
 
     const handleLike = () => {
       setLiked(!liked);
       setLikeCount(liked ? likeCount - 1 : likeCount + 1);
+    };
+
+    const handleShare = () => {
+      Alert.alert(
+        'Compartir',
+        '¿Cómo te gustaría compartir este post?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Copiar enlace', onPress: () => Alert.alert('Enlace copiado') },
+          { text: 'Compartir en...', onPress: () => Alert.alert('Compartiendo...') }
+        ]
+      );
     };
 
     return (
@@ -149,9 +277,9 @@ export default function HomeScreen() {
             <Text style={[styles.actionText, liked && styles.likedText]}>{likeCount}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => openComments(item)}>
             <Ionicons name="chatbubble-outline" size={20} color="#666" />
-            <Text style={styles.actionText}>{item.comments}</Text>
+            <Text style={styles.actionText}>{item.comments.length}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton}>
@@ -159,13 +287,26 @@ export default function HomeScreen() {
             <Text style={styles.actionText}>{item.shares}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
             <Ionicons name="share-outline" size={20} color="#666" />
           </TouchableOpacity>
         </View>
       </View>
     );
   };
+
+  const CommentItem = ({ comment }: { comment: Comment }) => (
+    <View style={styles.commentItem}>
+      <Image source={{ uri: comment.user.avatar }} style={styles.commentAvatar} />
+      <View style={styles.commentContent}>
+        <View style={styles.commentHeader}>
+          <Text style={styles.commentUserName}>{comment.user.name}</Text>
+          <Text style={styles.commentTime}>{formatTime(comment.date)}</Text>
+        </View>
+        <Text style={styles.commentText}>{comment.content}</Text>
+      </View>
+    </View>
+  );
 
   return (
     <>
@@ -242,21 +383,104 @@ export default function HomeScreen() {
           </View>
 
           {/* Posts Feed */}
-          <FlatList
+          <FlatList<Post>
             data={posts}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => <PostItem item={item} />}
             contentContainerStyle={styles.feedContainer}
             showsVerticalScrollIndicator={false}
-            refreshing={false}
-            onRefresh={() => {}}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            ListHeaderComponent={
+              refreshing ? (
+                <View style={styles.refreshingIndicator}>
+                  <Text style={styles.refreshingText}>Cargando nuevos posts...</Text>
+                </View>
+              ) : null
+            }
           />
         </KeyboardAvoidingView>
+
+        {/* Modal de Comentarios */}
+        <Modal
+          visible={showComments}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowComments(false)}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity 
+                onPress={() => setShowComments(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Comentarios</Text>
+              <View style={{ width: 24 }} />
+            </View>
+
+            {selectedPost && (
+              <>
+                {/* Post original en el modal */}
+                <View style={styles.originalPost}>
+                  <View style={styles.postHeader}>
+                    <Image source={{ uri: selectedPost.user.avatar }} style={styles.userAvatar} />
+                    <View style={styles.userInfo}>
+                      <Text style={styles.userName}>{selectedPost.user.name}</Text>
+                      <Text style={styles.postTime}>{formatTime(selectedPost.date)}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.postContent}>{selectedPost.content}</Text>
+                </View>
+
+                {/* Lista de comentarios */}
+                <FlatList<Comment>
+                  data={selectedPost.comments}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => <CommentItem comment={item} />}
+                  style={styles.commentsList}
+                  ListEmptyComponent={
+                    <View style={styles.emptyComments}>
+                      <Text style={styles.emptyCommentsText}>
+                        Sé el primero en comentar
+                      </Text>
+                    </View>
+                  }
+                />
+
+                {/* Input para nuevo comentario */}
+                <View style={styles.commentInputContainer}>
+                  <Image source={{ uri: currentUser.avatar }} style={styles.commentInputAvatar} />
+                  <TextInput
+                    placeholder="Escribe un comentario..."
+                    value={newComment}
+                    onChangeText={setNewComment}
+                    style={styles.commentInput}
+                    multiline
+                  />
+                  <TouchableOpacity 
+                    style={[styles.sendButton, !newComment.trim() && styles.sendButtonDisabled]}
+                    onPress={addComment}
+                    disabled={!newComment.trim()}
+                  >
+                    <Ionicons 
+                      name="send" 
+                      size={20} 
+                      color={newComment.trim() ? "#667eea" : "#ccc"} 
+                    />
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </SafeAreaView>
+        </Modal>
       </SafeAreaView>
     </>
   );
 }
 
+// Estilos (igual que en tu código original)
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
@@ -302,6 +526,15 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: '#ff4757',
+  },
+  refreshingIndicator: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  refreshingText: {
+    color: '#667eea',
+    fontSize: 14,
+    fontWeight: '500',
   },
   createPostContainer: {
     flexDirection: 'row',
@@ -436,5 +669,116 @@ const styles = StyleSheet.create({
   },
   likedText: {
     color: '#e91e63',
+  },
+  
+  // Estilos del Modal
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  originalPost: {
+    backgroundColor: 'white',
+    margin: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: '#667eea',
+  },
+  commentsList: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  commentItem: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 12,
+  },
+  commentAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 12,
+  },
+  commentContent: {
+    flex: 1,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  commentUserName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginRight: 8,
+  },
+  commentTime: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  commentText: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  emptyComments: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyCommentsText: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  commentInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: 'white',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  commentInputAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 12,
+  },
+  commentInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    maxHeight: 100,
+    fontSize: 14,
+  },
+  sendButton: {
+    marginLeft: 8,
+    padding: 8,
+  },
+  sendButtonDisabled: {
+    opacity: 0.3,
   },
 });
